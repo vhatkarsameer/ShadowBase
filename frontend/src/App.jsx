@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Editor from '@monaco-editor/react'
 import axios from 'axios'
 
@@ -9,6 +9,23 @@ function App() {
   // Week 2: Metrics State
   const [replayCount, setReplayCount] = useState(0)
   const [errorRate, setErrorRate] = useState(0)
+
+  // Listen to live CDC stream from Spring Boot
+  useEffect(() => {
+    const eventSource = new EventSource('http://localhost:8080/api/v1/metrics/stream')
+
+    eventSource.addEventListener('metrics', (event) => {
+      setReplayCount(Number(event.data))
+    })
+
+    eventSource.onerror = (error) => {
+      console.error('SSE connection error:', error)
+      eventSource.close()
+    }
+
+    // Cleanup connection on unmount
+    return () => eventSource.close()
+  }, [])
 
   const runScript = async () => {
     setStatus('Spinning up temporary sandbox container...')
@@ -23,9 +40,6 @@ function App() {
         headers: { 'Content-Type': 'text/plain' }
       })
       setStatus(`  ${execRes.data}`)
-
-      // Update metrics on success
-      setReplayCount(prev => prev + 1)
 
     } catch (error) {
       setStatus(`  Error: ${error.response?.data || error.message}`)
